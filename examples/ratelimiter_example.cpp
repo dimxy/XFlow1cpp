@@ -8,7 +8,7 @@ void print_time_ms(const char * pref) {
 }
 
 int main() {
-    flo1cpp::RateLimiter rl(3.0, 1000);
+    xflow1cpp::RateLimiter rl(3.0, 1000);
     print_time_ms("starting at:");
     rl.acquire(10);
     print_time_ms("acquired 10 at:");
