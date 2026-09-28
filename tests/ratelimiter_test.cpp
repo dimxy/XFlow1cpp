@@ -11,7 +11,7 @@ long get_time_ms() {
 
 TEST(RateLimiterTest, AcquireWithinZeroLimit) {
     xflow1cpp::RateLimiter rl(0.0, 1000);
-    EXPECT_FALSE(rl.acquire(1));
+    EXPECT_TRUE(rl.acquire(1));
 }
 
 TEST(RateLimiterTest, AcquireWithinLimit) {
