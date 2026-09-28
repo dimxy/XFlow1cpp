@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Configure
-        run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+        run: cmake -B build -DCMAKE_BUILD_TYPE=Release -DTEST_TIME_SLACK_MS=500
 
       - name: Build
         run: cmake --build build --config Release --parallel

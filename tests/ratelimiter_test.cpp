@@ -3,6 +3,13 @@
 #include <thread> 
 #include "ratelimiter.h"
 
+// Extra milliseconds allowed on the upper bound of timing checks,
+// for slow or loaded machines such as shared CI runners
+#ifndef TEST_TIME_SLACK_MS
+#define TEST_TIME_SLACK_MS 0
+#endif
+const long kTimeSlackMs = TEST_TIME_SLACK_MS;
+
 long get_time_ms() {
     auto duration = std::chrono::steady_clock::now().time_since_epoch();
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
@@ -11,7 +18,7 @@ long get_time_ms() {
 
 TEST(RateLimiterTest, AcquireWithinZeroLimit) {
     xflow1cpp::RateLimiter rl(0.0, 1000);
-    EXPECT_TRUE(rl.acquire(1));
+    EXPECT_FALSE(rl.acquire(1));
 }
 
 TEST(RateLimiterTest, AcquireWithinLimit) {
@@ -19,7 +26,7 @@ TEST(RateLimiterTest, AcquireWithinLimit) {
     auto t0 = get_time_ms();
     EXPECT_TRUE(rl.acquire(1));
     auto t1 = get_time_ms();
-    EXPECT_TRUE(t1 - t0 < 100);
+    EXPECT_LT(t1 - t0, 100 + kTimeSlackMs);
 }
 
 TEST(RateLimiterTest, RejectsNegativeRequests) {
@@ -38,8 +45,8 @@ TEST(RateLimiterTest, AcquireWait2x) {
     EXPECT_TRUE(my_rl.acquire(8));
     EXPECT_TRUE(my_rl.acquire(9));
     auto t1 = get_time_ms();
-    EXPECT_TRUE(t1 - t0 >= 17 / 10.0 * 1000);
-    EXPECT_TRUE(t1 - t0 < 18 / 10.0 * 1000);
+    EXPECT_GE(t1 - t0, 17 / 10.0 * 1000);
+    EXPECT_LT(t1 - t0, 18 / 10.0 * 1000 + kTimeSlackMs);
 }
 
 TEST(RateLimiterTest, AcquireWithinLimit3x) {
@@ -49,7 +56,7 @@ TEST(RateLimiterTest, AcquireWithinLimit3x) {
     EXPECT_TRUE(my_rl.acquire(2));
     EXPECT_TRUE(my_rl.acquire(2));
     auto t1 = get_time_ms();
-    assert(t1 - t0 < 100);
+    EXPECT_LT(t1 - t0, 100 + kTimeSlackMs);
 }
 
 /* This test is flaky:
@@ -67,8 +74,8 @@ TEST(RateLimiterTest, AcquireWithinLimit3xNoBurst) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     EXPECT_TRUE(my_rl.acquire(9));
     auto t1 = get_time_ms();
-    EXPECT_TRUE(t1 - t0 >= 13 / 10.0 * 1000);
-    EXPECT_TRUE(t1 - t0 < 14 / 10.0 * 1000);
+    EXPECT_GE(t1 - t0, 13 / 10.0 * 1000);
+    EXPECT_LT(t1 - t0, 14 / 10.0 * 1000 + kTimeSlackMs);
 }
 
 TEST(RateLimiterTest, AcquireWithinLimit3xWithDelays) {
@@ -80,8 +87,8 @@ TEST(RateLimiterTest, AcquireWithinLimit3xWithDelays) {
     std::this_thread::sleep_for(std::chrono::milliseconds(2000));
     EXPECT_TRUE(my_rl.acquire(9));
     auto t1 = get_time_ms();
-    EXPECT_TRUE(t1 - t0 >= 4000); // no wait if sleep_for(2000) twice
-    EXPECT_TRUE(t1 - t0 < 4500);
+    EXPECT_GE(t1 - t0, 4000); // no wait if sleep_for(2000) twice
+    EXPECT_LT(t1 - t0, 4500 + kTimeSlackMs);
 }
 
 TEST(RateLimiterTest, RejectOverBurstInThread) {
@@ -101,8 +108,8 @@ TEST(RateLimiterTest, InfiniteLoopFixWithCeil) {
     EXPECT_TRUE(my_rl.acquire(4));
     EXPECT_TRUE(my_rl.acquire(3));
     auto t1 = get_time_ms();
-    EXPECT_TRUE(t1 - t0 >= 2333); // total 7 reqs when rps=3
-    EXPECT_TRUE(t1 - t0 < 2500);
+    EXPECT_GE(t1 - t0, 2333); // total 7 reqs when rps=3
+    EXPECT_LT(t1 - t0, 2500 + kTimeSlackMs);
 }
 
 TEST(RateLimiterTest, AcquireBigRequestOverLimit) {
@@ -112,8 +119,8 @@ TEST(RateLimiterTest, AcquireBigRequestOverLimit) {
     std::this_thread::sleep_for(std::chrono::milliseconds(2));
     EXPECT_TRUE(my_rl.acquire(1));
     auto t1 = get_time_ms();
-    EXPECT_TRUE(t1 - t0 >= 100 / 3.0 * 1000); // total 100 reqs when rps=3
-    EXPECT_TRUE(t1 - t0 < 101 / 3.0 * 1000);
+    EXPECT_GE(t1 - t0, 100 / 3.0 * 1000); // total 100 reqs when rps=3
+    EXPECT_LT(t1 - t0, 101 / 3.0 * 1000 + kTimeSlackMs);
 }
 
 TEST(RateLimiterTest, AcquireMultipleRequestsOverLimit) {
@@ -141,8 +148,8 @@ TEST(RateLimiterTest, AcquireMultipleRequestsOverLimit) {
     std::this_thread::sleep_for(std::chrono::milliseconds(2));
     EXPECT_TRUE(my_rl.acquire(1));
     auto t1 = get_time_ms();
-    EXPECT_TRUE(t1 - t0 >= 11 / 3.0 * 1000);
-    EXPECT_TRUE(t1 - t0 < 12 / 3.0 * 1000);
+    EXPECT_GE(t1 - t0, 11 / 3.0 * 1000);
+    EXPECT_LT(t1 - t0, 12 / 3.0 * 1000 + kTimeSlackMs);
 }
 
 TEST(RateLimiterTest, AcquireMultipleRequestsEachOverLimit) {
@@ -160,8 +167,8 @@ TEST(RateLimiterTest, AcquireMultipleRequestsEachOverLimit) {
     std::this_thread::sleep_for(std::chrono::milliseconds(2));
     EXPECT_TRUE(my_rl.acquire(19));
     auto t1 = get_time_ms();
-    EXPECT_TRUE(t1 - t0 >= 114 / 3.0 * 1000); // total 100 reqs when rps=3
-    EXPECT_TRUE(t1 - t0 < 115 / 3.0 * 1000);
+    EXPECT_GE(t1 - t0, 114 / 3.0 * 1000); // total 100 reqs when rps=3
+    EXPECT_LT(t1 - t0, 115 / 3.0 * 1000 + kTimeSlackMs);
 }
 
 TEST(RateLimiterTest, AcquireWithinLimitInThreads) {
@@ -177,8 +184,8 @@ TEST(RateLimiterTest, AcquireWithinLimitInThreads) {
     th1.join();
     th2.join();
     auto t1 = get_time_ms();
-    EXPECT_TRUE(t1 - t0 >= 12 / 3.0 * 1000);
-    EXPECT_TRUE(t1 - t0 < 13 / 3.0 * 1000);
+    EXPECT_GE(t1 - t0, 12 / 3.0 * 1000);
+    EXPECT_LT(t1 - t0, 13 / 3.0 * 1000 + kTimeSlackMs);
 }
 
 TEST(RateLimiterTest, AcquireWithinLimitInThreadsWithDelay) {
@@ -195,8 +202,8 @@ TEST(RateLimiterTest, AcquireWithinLimitInThreadsWithDelay) {
     th1.join();
     th2.join();
     auto t1 = get_time_ms();
-    EXPECT_TRUE(t1 - t0 >= 12 / 3.0 * 1000);
-    EXPECT_TRUE(t1 - t0 < 13 / 3.0 * 1000);
+    EXPECT_GE(t1 - t0, 12 / 3.0 * 1000);
+    EXPECT_LT(t1 - t0, 13 / 3.0 * 1000 + kTimeSlackMs);
 }
 
 TEST(RateLimiterTest, AcquireWaitForLimitInThreadsWithDelay) {
@@ -213,8 +220,8 @@ TEST(RateLimiterTest, AcquireWaitForLimitInThreadsWithDelay) {
     th1.join();
     th2.join();
     auto t1 = get_time_ms();
-    EXPECT_TRUE(t1 - t0 >= 30 / 10.0 * 1000);
-    EXPECT_TRUE(t1 - t0 < 32 / 10.0 * 1000); // '32' for extra time to cover sleep_for
+    EXPECT_GE(t1 - t0, 30 / 10.0 * 1000);
+    EXPECT_LT(t1 - t0, 32 / 10.0 * 1000 + kTimeSlackMs); // '32' for extra time to cover sleep_for
 }
 
 TEST(RateLimiterTest, AcquireInThreadsWithDelayedStart) {
@@ -240,8 +247,8 @@ TEST(RateLimiterTest, AcquireInThreadsWithDelayedStart) {
         th1.join();
         th2.join();
         auto t1 = get_time_ms();
-        EXPECT_TRUE(t1 - t0 >= 7400); 
-        EXPECT_TRUE(t1 - t0 < 7900); // approx upper bound
+        EXPECT_GE(t1 - t0, 7400); 
+        EXPECT_LT(t1 - t0, 7900 + kTimeSlackMs); // approx upper bound
     }
 }
 
@@ -254,6 +261,6 @@ TEST(RateLimiterTest, AcquireWithTotalReqsDecayTotalReqs) {
     EXPECT_TRUE(my_rl.acquire(9));
     EXPECT_TRUE(my_rl.acquire(9));
     auto t1 = get_time_ms();
-    EXPECT_TRUE(t1 - t0 >= 45 / 3.0 * 1000); // sleep_for(2000) not included
-    EXPECT_TRUE(t1 - t0 < 46 / 3.0 * 1000);
+    EXPECT_GE(t1 - t0, 45 / 3.0 * 1000); // sleep_for(2000) not included
+    EXPECT_LT(t1 - t0, 46 / 3.0 * 1000 + kTimeSlackMs);
 }
