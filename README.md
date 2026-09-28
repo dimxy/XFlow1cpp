@@ -27,5 +27,9 @@ Running tests:
 ./build/unit_tests --gtest_filter=RateLimiterTest.AcquireWithinZeroLimit
 ```
 
+### Release Notes
+#### v0.0.1 - Sept, 28, 2026
+Rate limiter added.
+
 ---
 [**LICENSE**](./LICENSE)
