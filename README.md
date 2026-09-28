@@ -1,5 +1,5 @@
 # xflow1cpp library
-My free lib with a few C++ tools.
+My free C++ lib with tools for network applications.
 
 Currently there is only one tool in the lib: rate limiter.
 
