@@ -27,6 +27,8 @@ FetchContent_MakeAvailable(googletest)
 enable_testing()
 add_executable(unit_tests tests/ratelimiter_test.cpp)
 target_link_libraries(unit_tests PRIVATE GTest::gtest_main)
+set(TEST_TIME_SLACK_MS 0 CACHE STRING "Extra ms allowed on timing test upper bounds (e.g. for CI runners)")
+target_compile_definitions(unit_tests PRIVATE TEST_TIME_SLACK_MS=${TEST_TIME_SLACK_MS})
 # target_compile_definitions(unit_tests PRIVATE RATELIMITER_DEBUG)
 
 include(GoogleTest)
